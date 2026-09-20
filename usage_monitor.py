@@ -31,6 +31,7 @@ import glob
 import json
 import os
 import queue
+import random
 import struct
 import sys
 import threading
@@ -52,12 +53,27 @@ OAUTH_BETA = "oauth-2025-04-20"
 USER_AGENT = "usage-monitor/1.0 (+local)"
 
 # How often each source is polled, in seconds. Claude is deliberately slower
-# than Codex because it hits a network endpoint that has its own request budget
-# (polling it too fast earns a 429). Countdown timers still tick live every
-# second regardless of these values. Both are overridable in config.json.
-DEFAULT_CLAUDE_POLL = 60
+# than Codex because it hits a network endpoint whose per-client budget cswap
+# measured at ~28-30 requests per rolling hour (a sliding window, so a burst can
+# lock the client out for up to an hour). 180s is 20 requests/hour, safely under
+# that; the 429 recovery policy below handles the rest. Countdown timers still
+# tick live every second regardless. Both are overridable in config.json.
+DEFAULT_CLAUDE_POLL = 180
 DEFAULT_CODEX_POLL = 10
 TICK_MS = 1000
+
+# 429 recovery for the usage endpoint. Because the budget is a sliding hour and
+# retrying near the server's deadline tends to re-block, a 429 makes us hold the
+# cadence well above normal for a full window (growing it while 429s persist),
+# honor a positive Retry-After plus a margin, and jitter every interval so
+# independent pollers do not fetch in lockstep. See plan_claude_interval.
+POST_429_MIN_POLL = 360.0     # floor after any 429 (6 min)
+POST_429_MAX_POLL = 1800.0    # ceiling while 429s persist (30 min)
+POST_429_BACKOFF_MULT = 1.5   # grow the interval per recurring 429
+RECENT_429_WINDOW = 3600.0    # keep the floor this long after the last 429
+RETRY_AFTER_MARGIN = 900.0    # added to a positive Retry-After before waiting
+RETRY_AFTER_MAX = 4500.0      # cap on the total honored wait
+POLL_JITTER_FRAC = 0.1        # +/-10% so independent pollers do not sync
 
 FIVE_HOUR_S = 5 * 3600
 SEVEN_DAY_S = 7 * 86400
@@ -178,6 +194,46 @@ def expected_pct(reset_dt: datetime | None, window_s: int | None) -> float | Non
     elapsed = window_s - remaining
     frac = elapsed / window_s
     return max(0.0, min(100.0, frac * 100.0))
+
+
+def plan_claude_interval(
+    *,
+    base_poll: float,
+    prev_interval: float,
+    had_429: bool,
+    retry_after: float | None,
+    recent_429: bool,
+    rng=random.random,
+) -> float:
+    """Seconds until the next Claude usage poll, given the last poll's outcome.
+
+    Follows cswap's discipline for the shared usage-endpoint budget:
+
+    - a 429 with a positive Retry-After honors it plus ``RETRY_AFTER_MARGIN``
+      (retrying on the server's own deadline tends to re-block), capped at
+      ``RETRY_AFTER_MAX`` and never below ``POST_429_MIN_POLL``;
+    - any other 429 (Retry-After 0 or absent) grows the previous interval by
+      ``POST_429_BACKOFF_MULT`` toward ``POST_429_MAX_POLL``, floored at
+      ``POST_429_MIN_POLL`` (additive-increase congestion control);
+    - a success while a 429 is still recent holds that floor, so the saturated
+      rolling hour ages out instead of being re-spent;
+    - a clean success returns the normal configured cadence.
+
+    Every result gets +/-``POLL_JITTER_FRAC`` jitter so independent pollers do
+    not fetch in lockstep. ``rng`` (0..1) is injectable for deterministic tests.
+    """
+    if had_429:
+        if retry_after and retry_after > 0:
+            interval = min(retry_after + RETRY_AFTER_MARGIN, RETRY_AFTER_MAX)
+            interval = max(interval, POST_429_MIN_POLL)
+        else:
+            grown = max(prev_interval * POST_429_BACKOFF_MULT, POST_429_MIN_POLL)
+            interval = min(grown, POST_429_MAX_POLL)
+    elif recent_429:
+        interval = max(base_poll, POST_429_MIN_POLL)
+    else:
+        interval = base_poll
+    return interval * (1.0 + POLL_JITTER_FRAC * (2.0 * rng() - 1.0))
 
 
 # --------------------------------------------------------------------------- #
@@ -539,14 +595,14 @@ def meter_dib(size: int, rows) -> bytes:
     px = _blank(size)
     _draw_tile(px, size, size)
     m = max(1, size // 16)
-    pad = max(1, size // 16)
+    pad = max(1, size // 32)  # tight inner padding so the digits render larger
     x0, x1 = m + pad, size - 1 - m - pad
     y0, y1 = m + pad, size - 1 - m - pad
     if len(rows) <= 1:
         if rows:
             _draw_number(px, size, x0, y0, x1, y1, rows[0][0], rows[0][1])
     else:
-        gap = max(1, size // 12)
+        gap = max(1, size // 32)  # thin gap so each stacked number is taller
         row_h = (y1 - y0 + 1 - gap) // 2  # equal-height rows so digits match
         _draw_number(px, size, x0, y0, x1, y0 + row_h - 1, rows[0][0], rows[0][1])
         _draw_number(px, size, x0, y1 - row_h + 1, x1, y1, rows[1][0], rows[1][1])
@@ -657,7 +713,10 @@ if sys.platform == "win32":
     MF_STRING, MF_CHECKED, MF_SEPARATOR = 0x0, 0x8, 0x800
     WS_OVERLAPPED = 0x00000000
     CW_USEDEFAULT = -2147483648
-    ICON_SIZE = 32
+    # Rendered at 64px so Windows scales the notification-area icon DOWN (crisp)
+    # instead of upscaling a 32px source (blurry) on 150-250% displays, which
+    # made the stacked numbers hard to read.
+    ICON_SIZE = 64
 
     TRAY_CLASS = "UsageMonitorTrayCls"
 
@@ -998,6 +1057,10 @@ class App(tk.Tk):
         self.claude_email = None
         self._stop = threading.Event()
         self._force = threading.Event()
+        # Adaptive Claude cadence: the current interval (grown/decayed by the
+        # 429 policy) and when this token last 429'd, both in monotonic time.
+        self._claude_interval = float(self.claude_poll)
+        self._last_429_at = None
         self._last_tip = None
         self._last_meter = None
 
@@ -1177,22 +1240,37 @@ class App(tk.Tk):
             t = time.monotonic()
 
             if t >= next_claude:
+                had_429 = False
+                retry_after = None
                 try:
                     data = fetch_claude_usage()
                     if self.claude_email is None:
                         self.claude_email = read_claude_email()
                     with self.lock:
                         self.claude_state = {"data": data, "err": None}
-                    next_claude = t + self.claude_poll
                 except UsageError as e:
                     with self.lock:
                         self.claude_state["err"] = e
-                    backoff = getattr(e, "retry_after", None)
-                    next_claude = t + (backoff if backoff else self.claude_poll)
+                    if e.kind == "ratelimit":
+                        had_429 = True
+                        retry_after = getattr(e, "retry_after", None)
                 except Exception as e:
                     with self.lock:
                         self.claude_state["err"] = UsageError("error", str(e))
-                    next_claude = t + self.claude_poll
+                if had_429:
+                    self._last_429_at = t
+                recent_429 = (
+                    self._last_429_at is not None
+                    and (t - self._last_429_at) < RECENT_429_WINDOW
+                )
+                self._claude_interval = plan_claude_interval(
+                    base_poll=self.claude_poll,
+                    prev_interval=self._claude_interval,
+                    had_429=had_429,
+                    retry_after=retry_after,
+                    recent_429=recent_429,
+                )
+                next_claude = t + self._claude_interval
 
             if t >= next_codex:
                 try:

@@ -6,6 +6,23 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Raised the default Claude usage poll interval from 60s to 180s. The endpoint
+  budgets non-first-party clients to roughly 28-30 requests per rolling hour, so
+  60s (60/hour) was over the cap while 180s (20/hour) stays under it. Existing
+  `config.json` files are unaffected; set `claude_poll` to override.
+- Enlarged the system-tray icon (rendered at 64px with tighter padding) so the
+  stacked Claude and Codex numbers stay legible at 150-200% display scaling.
+
+### Added
+
+- Adaptive 429 recovery for the usage endpoint: after a rate-limit the poll
+  interval floors at 6 minutes and grows while 429s persist, a positive
+  `Retry-After` is honored with a margin (retrying on the server's deadline
+  tends to re-block), and every interval is jittered so independent pollers do
+  not fetch in lockstep.
+
 ## [1.0.0] - 2026-09-20
 
 First public release.

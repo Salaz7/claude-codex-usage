@@ -86,6 +86,57 @@ class TestExpectedPct(unittest.TestCase):
         self.assertEqual(um.expected_pct(future, um.SEVEN_DAY_S), 0.0)
 
 
+class TestClaudeInterval(unittest.TestCase):
+    """The adaptive 429-recovery cadence (pure policy)."""
+
+    def _plan(self, **kw):
+        kw.setdefault("base_poll", 180.0)
+        kw.setdefault("prev_interval", 180.0)
+        kw.setdefault("had_429", False)
+        kw.setdefault("retry_after", None)
+        kw.setdefault("recent_429", False)
+        kw.setdefault("rng", lambda: 0.5)  # 0.5 -> no jitter
+        return um.plan_claude_interval(**kw)
+
+    def test_steady_state_is_base(self):
+        self.assertEqual(self._plan(base_poll=180.0), 180.0)
+        self.assertEqual(self._plan(base_poll=240.0), 240.0)
+
+    def test_jitter_bounds(self):
+        self.assertAlmostEqual(self._plan(rng=lambda: 0.0), 180.0 * 0.9)
+        self.assertAlmostEqual(self._plan(rng=lambda: 1.0), 180.0 * 1.1)
+
+    def test_first_429_floors_at_min(self):
+        # No Retry-After: 180*1.5=270 would be too low, so it floors at the min.
+        self.assertEqual(
+            self._plan(had_429=True, prev_interval=180.0), um.POST_429_MIN_POLL
+        )
+
+    def test_429_aimd_growth(self):
+        self.assertEqual(
+            self._plan(had_429=True, prev_interval=360.0), 360.0 * um.POST_429_BACKOFF_MULT
+        )
+        # Growth is capped at the ceiling.
+        self.assertEqual(
+            self._plan(had_429=True, prev_interval=1500.0), um.POST_429_MAX_POLL
+        )
+
+    def test_429_retry_after_honored_with_margin(self):
+        self.assertEqual(
+            self._plan(had_429=True, retry_after=42), 42 + um.RETRY_AFTER_MARGIN
+        )
+
+    def test_429_retry_after_capped(self):
+        self.assertEqual(self._plan(had_429=True, retry_after=9000), um.RETRY_AFTER_MAX)
+
+    def test_recent_429_holds_floor_on_success(self):
+        # A success while a 429 is still recent stays at the floor, not base.
+        self.assertEqual(self._plan(recent_429=True, base_poll=180.0), um.POST_429_MIN_POLL)
+
+    def test_recovers_to_base_after_window(self):
+        self.assertEqual(self._plan(recent_429=False, base_poll=180.0), 180.0)
+
+
 class TestBarColor(unittest.TestCase):
     def test_thresholds(self):
         self.assertEqual(um.bar_color(10), um.COL["green"])

@@ -108,9 +108,10 @@ Both honor the standard overrides: `CLAUDE_CONFIG_DIR` and `CODEX_HOME`.
 ## Refresh rate
 
 - Codex is re-read every **10s** (cheap, local files).
-- Claude is fetched every **60s** by default. The Anthropic usage endpoint has
-  its own request budget, so polling it much faster earns a temporary rate-limit
-  (the app backs off automatically if that happens).
+- Claude is fetched every **180s** by default. The Anthropic usage endpoint
+  budgets non-first-party clients to roughly 28-30 requests per rolling hour, so
+  faster polling earns a temporary rate-limit. If that happens the app backs off
+  automatically (and jitters its interval) until the window recovers.
 - Countdown timers tick **live every second** regardless, so the display always
   feels current.
 
@@ -123,7 +124,7 @@ A small config file lives at
 |---------------|------------------------------------------|---------|
 | `x`, `y`      | remembered window position               | top-right |
 | `topmost`     | always-on-top on/off                     | `true`  |
-| `claude_poll` | seconds between Claude usage fetches      | `60`    |
+| `claude_poll` | seconds between Claude usage fetches      | `180`   |
 | `codex_poll`  | seconds between Codex reads               | `10`    |
 
 Edit the file and restart the app to change polling. Lowering `claude_poll` too
