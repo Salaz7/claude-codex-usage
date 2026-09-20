@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement or a new bit of information to show
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: The situation or friction you are running into today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Fits the project's constraints
+      options:
+        - label: Keeps the app a read-only monitor (no writing credentials, no account switching)
+        - label: Does not require a new third-party runtime dependency

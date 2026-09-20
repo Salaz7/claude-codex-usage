@@ -1,0 +1,41 @@
+name: Release
+
+# Push a tag like v1.0.0 to build the exe and publish a GitHub Release with it.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv (provides Python 3.12 and Tkinter)
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tests before release
+        run: uv run --python 3.12 --no-dev python -m unittest -v
+
+      - name: Build UsageMonitor.exe
+        run: >
+          uv run --python 3.12 --with pyinstaller pyinstaller
+          --noconfirm --onefile --windowed
+          --name UsageMonitor
+          --distpath dist --workpath build --specpath build
+          usage_monitor.py
+
+      - name: Publish release with the exe attached
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/UsageMonitor.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true

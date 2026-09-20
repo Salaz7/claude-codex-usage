@@ -1,0 +1,19 @@
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+
+# uv / tooling
+.venv/
+.ruff_cache/
+*.egg-info/
+
+# Editor / OS cruft
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in the widget is wrong or broken
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please never paste a credential, token, or the
+        contents of your `.credentials.json` file.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: The release you downloaded, or the commit hash if built from source.
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: How are you running it?
+      options:
+        - Prebuilt UsageMonitor.exe from a Release
+        - Built from source with build.ps1
+        - From source with run-from-source.bat
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and display scaling
+      placeholder: "Windows 11, 150%"
+    validations:
+      required: true
+  - type: dropdown
+    id: section
+    attributes:
+      label: Which part is affected?
+      options:
+        - Claude Code section
+        - Codex section
+        - Both sections
+        - Tray icon
+        - Window / movement / always-on-top
+        - Other
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots help. Blur or crop out anything sensitive first.

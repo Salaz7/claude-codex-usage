@@ -1,0 +1,42 @@
+[project]
+name = "usage-monitor"
+version = "1.0.0"
+description = "A tiny always-on-top Windows widget showing Claude Code and Codex usage limits at a glance."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Salaz7" }]
+keywords = ["claude", "codex", "usage", "monitor", "widget", "tkinter", "windows"]
+classifiers = [
+    "Environment :: Win32 (MS Windows)",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+    "Intended Audience :: Developers",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Salaz7/claude-codex-usage"
+Repository = "https://github.com/Salaz7/claude-codex-usage"
+Issues = "https://github.com/Salaz7/claude-codex-usage/issues"
+
+# This is an application run from source or packaged with PyInstaller, not a
+# published package, so uv should not try to build or install it as one.
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = ["pyinstaller>=6.0", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Pyflakes (F) catches real defects: unused imports, undefined names, shadowing.
+# pycodestyle (E/W) and isort (I) keep style and imports consistent. The app
+# deliberately swallows best-effort failures (config writes, DPI calls, tray
+# setup), so the blind-except and try-except-pass rules are intentionally off.
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # long lines are fine; many are aligned ctypes signatures
