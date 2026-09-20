@@ -122,6 +122,16 @@ def save_config(cfg: dict) -> None:
         pass
 
 
+def wants_start_hidden(argv: list[str], cfg: dict) -> bool:
+    """Whether to launch straight into the tray instead of showing the window.
+
+    True when a command-line flag (--minimized / --tray / --hidden) is present
+    or the ``start_hidden`` config key is set. Handy for a Windows-startup entry.
+    """
+    flags = {"--minimized", "--tray", "--hidden"}
+    return any(a in flags for a in argv) or bool(cfg.get("start_hidden", False))
+
+
 # --------------------------------------------------------------------------- #
 # Small helpers
 # --------------------------------------------------------------------------- #
@@ -1017,8 +1027,12 @@ class Section:
 # --------------------------------------------------------------------------- #
 
 class App(tk.Tk):
-    def __init__(self):
+    def __init__(self, start_hidden: bool = False):
         super().__init__()
+        # Stay unmapped until the UI is fully built (avoids a flash), and so we
+        # can start directly in the tray when asked.
+        self.withdraw()
+        self._start_hidden = bool(start_hidden)
         self.cfg = load_config()
         self.claude_poll = int(self.cfg.get("claude_poll", DEFAULT_CLAUDE_POLL))
         self.codex_poll = int(self.cfg.get("codex_poll", DEFAULT_CODEX_POLL))
@@ -1095,6 +1109,15 @@ class App(tk.Tk):
         self.after(150, self._tick)
         self.after(100, self._drain_cmds)
         self.protocol("WM_DELETE_WINDOW", self._quit)
+
+        # Reveal the window now, unless asked to start in the tray (and there is
+        # a tray to bring it back from; otherwise always show, never strand it).
+        if self._start_hidden and self.tray is not None:
+            self._visible = False
+        else:
+            self.deiconify()
+            self.attributes("-topmost", self._topmost)
+            self._visible = True
 
     # -- title bar ---------------------------------------------------------- #
     def _build_titlebar(self, parent):
@@ -1395,7 +1418,7 @@ def enable_dpi_awareness():
 def main():
     if sys.platform == "win32":
         enable_dpi_awareness()
-    app = App()
+    app = App(start_hidden=wants_start_hidden(sys.argv[1:], load_config()))
     app.minsize(app.px(300), 0)
     app.mainloop()
 

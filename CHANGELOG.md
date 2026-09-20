@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Start minimized to the tray via a `start_hidden` config key or a `--minimized`
+  command-line flag (also `--tray` / `--hidden`), handy for a Windows-startup
+  entry.
+
 ## [1.0.1] - 2026-09-20
 
 ### Changed

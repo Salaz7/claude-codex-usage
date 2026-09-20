@@ -91,7 +91,10 @@ whenever you want. Closing with **×** or the tray's Quit exits completely and
 removes the tray icon.
 
 To launch it automatically at login, press `Win+R`, type `shell:startup`, and
-drop a shortcut to `UsageMonitor.exe` into that folder.
+drop a shortcut to `UsageMonitor.exe` into that folder. To have it start
+minimized to the tray, either set `start_hidden` to `true` in the config (see
+[Settings](#settings)) or add `--minimized` to the shortcut's target (right-click
+the shortcut, Properties, append ` --minimized` to Target).
 
 ## How it gets the data (reads local files, no Codex CLI needed)
 
@@ -126,6 +129,7 @@ A small config file lives at
 | `topmost`     | always-on-top on/off                     | `true`  |
 | `claude_poll` | seconds between Claude usage fetches      | `180`   |
 | `codex_poll`  | seconds between Codex reads               | `10`    |
+| `start_hidden`| start minimized to the tray on launch    | `false` |
 
 Edit the file and restart the app to change polling. Lowering `claude_poll` too
 far may trigger rate-limit backoff.

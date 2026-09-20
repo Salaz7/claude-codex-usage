@@ -166,6 +166,20 @@ class TestMeterWindow(unittest.TestCase):
         self.assertIsNone(um.pick_meter_window([]))
 
 
+class TestStartHidden(unittest.TestCase):
+    def test_flags(self):
+        for flag in ("--minimized", "--tray", "--hidden"):
+            self.assertTrue(um.wants_start_hidden([flag], {}))
+
+    def test_config_key(self):
+        self.assertTrue(um.wants_start_hidden([], {"start_hidden": True}))
+        self.assertFalse(um.wants_start_hidden([], {"start_hidden": False}))
+
+    def test_default_and_unknown_args(self):
+        self.assertFalse(um.wants_start_hidden([], {}))
+        self.assertFalse(um.wants_start_hidden(["--nope"], {}))
+
+
 class TestCodexLabel(unittest.TestCase):
     def test_labels(self):
         self.assertEqual(um.codex_window_label(300), "5-hour")
