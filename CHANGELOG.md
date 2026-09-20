@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-20
+
 ### Added
 
 - Start minimized to the tray via a `start_hidden` config key or a `--minimized`
@@ -55,6 +57,7 @@ First public release.
 - Automatic rate-limit backoff for the Anthropic usage endpoint.
 - Hermetic test suite (no network, no real credentials).
 
-[Unreleased]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Salaz7/claude-codex-usage/releases/tag/v1.0.0
