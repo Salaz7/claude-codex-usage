@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-20
+
 ### Changed
 
 - Raised the default Claude usage poll interval from 60s to 180s. The endpoint
@@ -14,6 +16,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `config.json` files are unaffected; set `claude_poll` to override.
 - Enlarged the system-tray icon (rendered at 64px with tighter padding) so the
   stacked Claude and Codex numbers stay legible at 150-200% display scaling.
+- The tray icon now shows each service's Weekly percentage (falling back to the
+  worst window when no weekly one is reported) instead of always the worst.
 
 ### Added
 
@@ -45,5 +49,6 @@ First public release.
 - Automatic rate-limit backoff for the Anthropic usage endpoint.
 - Hermetic test suite (no network, no real credentials).
 
-[Unreleased]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Salaz7/claude-codex-usage/releases/tag/v1.0.0

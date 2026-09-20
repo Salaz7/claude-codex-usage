@@ -878,6 +878,19 @@ def bar_color(pct: float) -> str:
     return COL["green"]
 
 
+def pick_meter_window(windows: list[dict]) -> dict | None:
+    """The window the tray icon should display for a service.
+
+    Prefers the Weekly window (the limit most worth watching at a glance);
+    falls back to the worst (highest-percent) window when no weekly one is
+    reported, and returns None when there are no windows at all.
+    """
+    if not windows:
+        return None
+    weekly = next((w for w in windows if w.get("name") == "Weekly"), None)
+    return weekly or max(windows, key=lambda w: w["pct"])
+
+
 class Row:
     def __init__(self, parent: tk.Widget, s, fonts: dict, grid_row: int):
         self.s = s
@@ -1335,11 +1348,12 @@ class App(tk.Tk):
         self.after(TICK_MS, self._tick)
 
     def _meter_rows(self, claude, codex):
-        """Tray icon rows: worst Claude % on top, worst Codex % below."""
+        """Tray icon rows: Claude Weekly % on top, Codex Weekly % below (each
+        falling back to its worst window when no weekly one is reported)."""
         def one(state):
-            data = state.get("data")
-            if data and data.get("windows"):
-                pct = max(w["pct"] for w in data["windows"])
+            win = pick_meter_window((state.get("data") or {}).get("windows") or [])
+            if win is not None:
+                pct = win["pct"]
                 text = "100" if pct >= 99.5 else str(int(round(pct)))
                 return (text, hex_to_rgb(bar_color(pct)))
             return ("--", hex_to_rgb(COL["faint"]))

@@ -147,6 +147,25 @@ class TestBarColor(unittest.TestCase):
         self.assertEqual(um.bar_color(100), um.COL["red"])
 
 
+class TestMeterWindow(unittest.TestCase):
+    def test_prefers_weekly_over_higher_windows(self):
+        wins = [
+            {"name": "5-hour", "pct": 90.0},
+            {"name": "Weekly", "pct": 30.0},
+            {"name": "Fable", "pct": 100.0},
+        ]
+        chosen = um.pick_meter_window(wins)
+        self.assertEqual(chosen["name"], "Weekly")
+        self.assertEqual(chosen["pct"], 30.0)
+
+    def test_falls_back_to_worst_when_no_weekly(self):
+        wins = [{"name": "5-hour", "pct": 40.0}, {"name": "Daily", "pct": 75.0}]
+        self.assertEqual(um.pick_meter_window(wins)["pct"], 75.0)
+
+    def test_empty(self):
+        self.assertIsNone(um.pick_meter_window([]))
+
+
 class TestCodexLabel(unittest.TestCase):
     def test_labels(self):
         self.assertEqual(um.codex_window_label(300), "5-hour")
