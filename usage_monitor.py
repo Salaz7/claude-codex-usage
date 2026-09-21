@@ -62,6 +62,11 @@ DEFAULT_CLAUDE_POLL = 180
 DEFAULT_CODEX_POLL = 10
 TICK_MS = 1000
 
+# Snapshot age past which the status line is amber-flagged as stale. Codex only
+# writes usage to its logs while it is actively running, so an idle Codex leaves
+# the last value showing; this makes that visible instead of looking current.
+STALE_AFTER_S = 3600
+
 # 429 recovery for the usage endpoint. Because the budget is a sliding hour and
 # retrying near the server's deadline tends to re-block, a 429 makes us hold the
 # cadence well above normal for a full window (growing it while 429s persist),
@@ -278,28 +283,6 @@ def read_claude_oauth() -> dict:
     if not isinstance(oauth, dict) or not oauth.get("accessToken"):
         raise UsageError("noauth", "No Claude OAuth token")
     return oauth
-
-
-def read_claude_email() -> str | None:
-    """Best-effort account email from ~/.claude.json (may lag after a switch)."""
-    env = os.environ.get("CLAUDE_CONFIG_DIR")
-    candidates = []
-    if env:
-        candidates.append(Path(env) / ".claude.json")
-    candidates.append(Path.home() / ".claude.json")
-    for path in candidates:
-        try:
-            if not path.exists() or path.stat().st_size > 25_000_000:
-                continue
-            data = json.loads(path.read_text(encoding="utf-8"))
-            acct = data.get("oauthAccount")
-            if isinstance(acct, dict):
-                email = acct.get("emailAddress")
-                if email:
-                    return str(email)
-        except Exception:
-            continue
-    return None
 
 
 def fetch_claude_usage() -> dict:
@@ -1005,9 +988,9 @@ class Section:
         self.message = tk.Label(self.container, text="", bg=COL["bg"],
                                 fg=COL["dim"], font=fonts["status"], anchor="w")
 
-    def show_windows(self, windows: list[dict], status: str):
+    def show_windows(self, windows: list[dict], status: str, status_color: str = None):
         self.message.pack_forget()
-        self.status.config(text=status)
+        self.status.config(text=status, fg=status_color or COL["faint"])
         for i, row in enumerate(self.rows):
             if i < len(windows):
                 row.update(windows[i])
@@ -1081,7 +1064,6 @@ class App(tk.Tk):
         self.lock = threading.Lock()
         self.claude_state = {"data": None, "err": None}
         self.codex_state = {"data": None, "err": None}
-        self.claude_email = None
         self._stop = threading.Event()
         self._force = threading.Event()
         # Adaptive Claude cadence: the current interval (grown/decayed by the
@@ -1280,8 +1262,6 @@ class App(tk.Tk):
                 retry_after = None
                 try:
                     data = fetch_claude_usage()
-                    if self.claude_email is None:
-                        self.claude_email = read_claude_email()
                     with self.lock:
                         self.claude_state = {"data": data, "err": None}
                 except UsageError as e:
@@ -1332,15 +1312,22 @@ class App(tk.Tk):
         err = state.get("err")
 
         if data and data.get("windows"):
-            if source == "claude":
-                tag = self.claude_email or (data.get("sub") or "")
-            else:
-                tag = f"{data.get('plan') or ''} plan".strip()
-            status = f"{tag}   {human_ago(data.get('at'))}".strip()
+            # Show the plan ("max plan" / "pro plan"), not the account email:
+            # the email lags after an account switch, while the plan is read
+            # fresh from the credentials on every poll.
+            plan = data.get("sub") if source == "claude" else data.get("plan")
+            tag = f"{plan} plan" if plan else ""
+            at = data.get("at")
+            status = f"{tag}   {human_ago(at)}".strip()
+            # Amber-flag a stale snapshot so old data does not read as current
+            # (Codex stops updating its logs when it is idle).
+            age = (now_utc() - at).total_seconds() if at else None
+            status_color = COL["amber"] if age and age > STALE_AFTER_S else None
             # If the latest poll errored, note it but keep showing last-good data.
             if err and err.kind in ("ratelimit", "network", "stale", "http"):
-                status = f"{err.message}   {human_ago(data.get('at'))}"
-            section.show_windows(data["windows"], status)
+                status = f"{err.message}   {human_ago(at)}"
+                status_color = COL["amber"]
+            section.show_windows(data["windows"], status, status_color)
         elif err:
             hint = {
                 "noauth": COL["faint"],

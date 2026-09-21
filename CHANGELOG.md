@@ -6,6 +6,20 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-09-21
+
+### Fixed
+
+- The Claude section now shows the plan (like "max plan"), matching the Codex
+  row, instead of the account email. The email came from `~/.claude.json`, which
+  lags after an account switch and was cached for the whole session; the plan is
+  read fresh from the credentials on every poll. The app no longer reads
+  `~/.claude.json` at all.
+- Stale snapshots are now flagged: when the newest data is over an hour old (for
+  example Codex writes usage to its logs only while running, so an idle Codex
+  leaves the last value showing), the status line's age turns amber so old data
+  does not read as current.
+
 ## [1.0.2] - 2026-09-20
 
 ### Added
@@ -57,7 +71,8 @@ First public release.
 - Automatic rate-limit backoff for the Anthropic usage endpoint.
 - Hermetic test suite (no network, no real credentials).
 
-[Unreleased]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Salaz7/claude-codex-usage/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Salaz7/claude-codex-usage/releases/tag/v1.0.0

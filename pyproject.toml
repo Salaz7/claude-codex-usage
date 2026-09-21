@@ -1,6 +1,6 @@
 [project]
 name = "usage-monitor"
-version = "1.0.2"
+version = "1.0.3"
 description = "A tiny always-on-top Windows widget showing Claude Code and Codex usage limits at a glance."
 readme = "README.md"
 requires-python = ">=3.12"

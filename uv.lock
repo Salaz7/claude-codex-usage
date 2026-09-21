@@ -126,7 +126,7 @@ wheels = [
 
 [[package]]
 name = "usage-monitor"
-version = "1.0.1"
+version = "1.0.3"
 source = { virtual = "." }
 
 [package.dev-dependencies]
